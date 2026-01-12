@@ -59,10 +59,15 @@ app.post('/api/messages', async (req, res) => {
     }
 });
 
-// GET route - Retrieve all messages
+// GET route - Retrieve messages (with optional "sim" filter)
 app.get('/api/messages', async (req, res) => {
     try {
-        const messages = await SmsMessage.find().sort({ createdAt: -1 });
+        const { sim } = req.query;
+
+        // Create filter object - if 'sim' exists in query, filter by it, otherwise get all
+        const filter = sim ? { sim } : {};
+
+        const messages = await SmsMessage.find(filter).sort({ createdAt: -1 });
         res.status(200).json({ success: true, count: messages.length, data: messages });
     } catch (error) {
         res.status(500).json({ error: 'Failed to retrieve messages', details: error.message });
