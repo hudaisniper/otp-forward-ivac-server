@@ -30,16 +30,38 @@ mongoose.connect(MONGODB_URI)
     .then(() => console.log('✅ Connected to MongoDB'))
     .catch((error) => console.error('❌ MongoDB connection error:', error));
 
+// Helper function to convert spelled numbers to digits
+const convertSpelledNumbersToDigits = (spelledString) => {
+    const wordToNum = {
+        'One': '1', 'Two': '2', 'Three': '3', 'Four': '4',
+        'Five': '5', 'Six': '6', 'Seven': '7', 'Eight': '8',
+        'Nine': '9', 'Zero': '0'
+    };
+
+    const words = spelledString.split('-');
+    return words.map(word => wordToNum[word] || '').join('');
+};
+
 // POST route - Save SMS message with OTP extraction
 app.post('/api/messages', async (req, res) => {
     try {
         const { from, text, sentStamp, receivedStamp, sim } = req.body;
 
-        // Extract OTP using regex
-        // Looks for patterns like: "Your reference, ABC123XYZ helps complete the IVAC verification."
-        const otpRegex = /^Your reference,\s+(.+)\s+helps complete the IVAC verification\.$/;
+        // Validate required fields
+        if (!from || !text || !sentStamp || !receivedStamp || !sim) {
+            return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        let otp = '';
+
+        // Regex to match: "(IVACBD) For security, type the following sequence when prompted One-Four-Seven-Nine-Five-Six ."
+        const otpRegex = /\(IVACBD\) For security, type the following sequence when prompted\s+([a-zA-Z]+(?:-[a-zA-Z]+)*)\s*\./;
         const match = text.match(otpRegex);
-        const otp = match ? match[1] : '';
+
+        if (match && match[1]) {
+            // match[1] will be something like "One-Four-Seven-Nine-Five-Six"
+            otp = convertSpelledNumbersToDigits(match[1]);
+        }
 
         // Create and save the message
         const message = new SmsMessage({
