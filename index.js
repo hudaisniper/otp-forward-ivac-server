@@ -121,7 +121,12 @@ app.delete('/api/messages/:id', async (req, res) => {
 // DELETE route - Delete all messages
 app.delete('/api/messages', async (req, res) => {
     try {
-        const result = await SmsMessage.deleteMany({});
+        const { sim } = req.query;
+
+        // Create filter object - if 'sim' exists in query, filter by it, otherwise get all
+        const filter = sim ? { sim } : {};
+
+        const result = await SmsMessage.deleteMany(filter);
         res.status(200).json({
             success: true,
             message: 'All messages deleted successfully',
