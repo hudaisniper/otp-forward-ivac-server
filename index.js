@@ -96,6 +96,38 @@ app.get('/api/messages', async (req, res) => {
     }
 });
 
+// GET route - Retrieve the latest single message by sim and date
+app.get('/api/messages/single', async (req, res) => {
+    try {
+        const { sim, date } = req.query;
+
+        // Validate required fields
+        if (!sim || !date) {
+            return res.status(400).json({ error: 'Both sim and date are required' });
+        }
+
+        // Validate date format
+        const parsedDate = new Date(date);
+        if (isNaN(parsedDate.getTime())) {
+            return res.status(400).json({ error: 'Invalid date format' });
+        }
+
+        // Find the latest message matching sim and createdAt > date
+        const message = await SmsMessage.findOne({
+            sim: sim,
+            createdAt: { $gt: parsedDate }
+        }).sort({ createdAt: -1 });
+
+        if (!message) {
+            return res.status(404).json({ error: 'No message found matching the criteria' });
+        }
+
+        res.status(200).json({ success: true, data: message });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to retrieve message', details: error.message });
+    }
+});
+
 // DELETE route - Delete a single message by ID
 app.delete('/api/messages/:id', async (req, res) => {
     try {
