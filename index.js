@@ -115,7 +115,8 @@ app.get('/api/messages/single', async (req, res) => {
         // Find the latest message matching sim and createdAt > date
         const message = await SmsMessage.findOne({
             sim: sim,
-            createdAt: { $gt: parsedDate }
+            createdAt: { $gt: parsedDate },
+            otp: { $ne: '' }
         }).sort({ createdAt: -1 });
 
         if (!message) {
