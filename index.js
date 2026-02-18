@@ -25,10 +25,71 @@ const smsMessageSchema = new mongoose.Schema({
 
 const SmsMessage = mongoose.model('SmsMessage', smsMessageSchema);
 
-// Connect to MongoDB
-mongoose.connect(MONGODB_URI)
-    .then(() => console.log('✅ Connected to MongoDB'))
-    .catch((error) => console.error('❌ MongoDB connection error:', error));
+// Cached connection for serverless environments
+let cachedConnection = null;
+
+// Configure mongoose for serverless
+mongoose.set('strictQuery', false);
+
+// Connect to MongoDB with serverless-optimized settings
+const connectToDatabase = async () => {
+    if (cachedConnection && mongoose.connection.readyState === 1) {
+        console.log('✅ Using cached MongoDB connection');
+        return cachedConnection;
+    }
+
+    try {
+        const options = {
+            serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+            socketTimeoutMS: 45000,
+            maxPoolSize: 10,
+            minPoolSize: 1,
+            maxIdleTimeMS: 10000,
+            retryWrites: true,
+            retryReads: true,
+            // Fail fast instead of buffering operations
+            bufferCommands: false,
+        };
+
+        const conn = await mongoose.connect(MONGODB_URI, options);
+        cachedConnection = conn;
+        console.log('✅ New MongoDB connection established');
+        return conn;
+    } catch (error) {
+        console.error('❌ MongoDB connection error:', error);
+        cachedConnection = null;
+        throw error;
+    }
+};
+
+// Handle connection errors
+mongoose.connection.on('error', (err) => {
+    console.error('MongoDB connection error:', err);
+    cachedConnection = null;
+});
+
+mongoose.connection.on('disconnected', () => {
+    console.log('MongoDB disconnected');
+    cachedConnection = null;
+});
+
+// Initialize connection
+connectToDatabase().catch(console.error);
+
+// Middleware to ensure database connection before each request
+app.use('/api', async (req, res, next) => {
+    try {
+        await connectToDatabase();
+        next();
+    } catch (error) {
+        console.error('Database connection failed:', error);
+        return res.status(503).json({
+            error: 'Database connection failed',
+            message: 'Unable to connect to database. Please try again later.',
+            details: error.message
+        });
+    }
+});
 
 // Helper function to convert spelled numbers to digits
 const convertSpelledNumbersToDigits = (spelledString) => {
@@ -175,7 +236,12 @@ app.get('/', (req, res) => {
     res.json({ status: 'Server is running', timestamp: new Date().toISOString() });
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`🚀 Server is running on port ${PORT}`);
-});
+// Start server (only in development)
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`🚀 Server is running on port ${PORT}`);
+    });
+}
+
+// Export for Vercel serverless
+export default app;
