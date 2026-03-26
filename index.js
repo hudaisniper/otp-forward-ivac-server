@@ -129,7 +129,12 @@ app.post('/api/messages', async (req, res) => {
             otp = convertSpelledNumbersToDigits(match[1]);
         }
 
-        // Create and save the message
+        // if otp is not found, don't add it to the database
+        if (!otp) {
+            return res.status(200).json({ success: false, message: 'OTP not found in the message text' });
+        }
+
+        // if otp is found, create and save the message
         const message = new SmsMessage({
             from,
             text,
